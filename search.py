@@ -42,20 +42,13 @@ def get_mcmod_search_result(search):
             
             # 提取地址和检查 info
             address = result_item.find('span', class_='info').find('a')['href'].replace("//center.mcmod.cn", "https://center.mcmod.cn")
-            
             item_data['address'] = address
-
-            if 'mcmod.cn/class' not in address and 'mcmod.cn/modpack' not in address:
-                item_data['info'] = []
-                results.append(item_data)
-                continue
             
             # 创建 mcmod_id 属性
             item_data['mcmod_id'] = address.split('/')[-1].replace('.html', '')
             
             # 提取标题
             title = result_item.find('div', class_='head').text.strip()
-
             item_data['title'] = title
             
             # 创建 abbr 属性
@@ -87,6 +80,14 @@ def get_mcmod_search_result(search):
             
             # 提取快照时间
             item_data['snapshot_time'] = result_item.find_all('span', class_='info')[1].find('span', class_='value').text.strip()
+
+            if 'mcmod.cn/class' not in address and 'mcmod.cn/modpack' not in address:
+                item_data['chinese_name'] = None
+                item_data['sub_name'] = None
+                item_data['abbr'] = None
+                item_data['mcmod_id'] = None
+                results.append(item_data)
+                continue
             
             results.append(item_data)
         
