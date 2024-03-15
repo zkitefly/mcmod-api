@@ -1,0 +1,5 @@
+{
+    "builds": [{ "src": "search.py", "use": "@vercel/python" }],
+    "routes": [{ "src": "/s/.*", "dest": "search.py" }],
+    "regions": ["hkg1"]
+}
