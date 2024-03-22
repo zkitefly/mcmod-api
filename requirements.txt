@@ -3,4 +3,3 @@ flask_caching
 requests
 bs4
 node-semver
-re
