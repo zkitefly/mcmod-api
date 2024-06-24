@@ -61,8 +61,8 @@ def get_mcmod_search_result(search):
             # 创建 sub_name 属性
             if ' (' in title:
                 sub_name = title.split(' (', 1)[-1].rsplit(')', 1)[0]
-                if not ' ' in sub_name:
-                    sub_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', sub_name)
+                # if not ' ' in sub_name:
+                #     sub_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', sub_name)
                 item_data['sub_name'] = sub_name
             else:
                 item_data['sub_name'] = title.split('] ')[-1]
