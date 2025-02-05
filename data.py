@@ -9,10 +9,10 @@ def get_redirected_url(url):
     # 如果链接是以 // 开头，需要加上 https:
     if url.startswith('//'):
         url = 'https:' + url
-    try:
-        response = requests.head(url, allow_redirects=True)  # 只发送头请求来获取重定向
-        return response.url  # 获取重定向后的最终 URL
-    except requests.RequestException:
+    # try:
+    #     response = requests.head(url, allow_redirects=True)  # 只发送头请求来获取重定向
+    #     return response.url  # 获取重定向后的最终 URL
+    # except requests.RequestException:
         return url  # 如果出错，返回原始 URL
 
 def parse_mod_data(html_content):
