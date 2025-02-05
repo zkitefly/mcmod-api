@@ -2,53 +2,47 @@ from flask import Flask, jsonify, request
 import re
 import requests
 from bs4 import BeautifulSoup
+from flask_caching import Cache
 
 app = Flask(__name__)
 
+# 配置缓存，使用 SimpleCache，超时时间 5 分钟
+app.config["CACHE_TYPE"] = "simple"
+app.config["CACHE_DEFAULT_TIMEOUT"] = 300  # 5 分钟
+cache = Cache(app)
+
 def get_redirected_url(url):
-    # 如果链接是以 // 开头，需要加上 https:
     if url.startswith('//'):
         url = 'https:' + url
-    # try:
-    #     response = requests.head(url, allow_redirects=True)  # 只发送头请求来获取重定向
-    #     return response.url  # 获取重定向后的最终 URL
-    # except requests.RequestException:
-        return url  # 如果出错，返回原始 URL
+    return url  # 如果出错，返回原始 URL
 
 def parse_mod_data(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # 提取模组名称
     title = soup.find("h3").text if soup.find("h3") else None
-    
-    # 提取模组英文名称
     subtitle = soup.find("h4").text if soup.find("h4") else None
 
-    # 提取封面图片
     cover_image = soup.find("div", class_="class-cover-image").find("img")["src"] if soup.find("div", class_="class-cover-image") else None
-    if cover_image.startswith('//'):
+    if cover_image and cover_image.startswith('//'):
         cover_image = 'https:' + cover_image
 
-    # 提取模组描述
     description_meta = soup.find("meta", {"name": "description"})
     description = description_meta["content"] if description_meta else None
 
-    # **提取支持的MC版本**
     supported_versions = {}
     mcver_section = soup.find("li", class_="col-lg-12 mcver")
     if mcver_section:
-        current_loader = None  # 记录当前加载器类型
+        current_loader = None
         for element in mcver_section.find_all(["li", "a"]):
             if element.name == "li":
                 text = element.text.strip()
-                if text.endswith(":"):  # 检测是否是加载器类型，例如 "Forge:"
-                    current_loader = text[:-1]  # 去掉 `:` 作为键
-                    supported_versions[current_loader] = []  # 初始化列表
+                if text.endswith(":"):
+                    current_loader = text[:-1]
+                    supported_versions[current_loader] = []
             elif element.name == "a" and current_loader:
                 version = element.text.strip()
-                supported_versions[current_loader].append(version)  # 加入对应加载器的版本列表
+                supported_versions[current_loader].append(version)
 
-    # 提取 common-link-frame 相关链接
     related_links = []
     link_frame = soup.find("div", class_="common-link-frame")
     if link_frame:
@@ -60,17 +54,14 @@ def parse_mod_data(html_content):
                     link_url = get_redirected_url(link_url)
                 related_links.append({"text": link_text, "url": link_url})
 
-    # 提取 keywords
     keywords_meta = soup.find("meta", {"name": "keywords"})
     keywords = keywords_meta["content"] if keywords_meta else None
 
-    # 提取运行环境
     operating_environment = None
     match = re.search(r'<li class="col-lg-4">运行环境:\s*(.*?)</li>', html_content)
     if match:
         operating_environment = match.group(1)
 
-    # 提取 class="tag" 中的链接
     tag_links = []
     tag_section = soup.find("li", class_="col-lg-12 tag")
     if tag_section:
@@ -80,20 +71,16 @@ def parse_mod_data(html_content):
             if tag_link:
                 tag_links.append({"text": tag_text, "url": tag_link})
 
-    # 提取 short-name
     short_name = soup.find("span", class_="short-name").text if soup.find("span", class_="short-name") else None
 
-    # 正则表达式提取时间信息
     def extract_timestamp(text):
         match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', text)
         return match.group(1) if match else None
     
-    # 提取 Mod 作者/开发团队
     authors = []
     author_section = soup.find("li", class_="col-lg-12 author")
     if author_section:
         for author_item in author_section.find_all("li"):
-            # 获取作者的链接和名称
             author_link = author_item.find("a")["href"] if author_item.find("a") else None
             author_name = author_item.find("span", class_="name").text.strip() if author_item.find("span", class_="name") else None
             author_position = author_item.find("span", class_="position").text.strip() if author_item.find("span", class_="position") else None
@@ -145,6 +132,7 @@ def parse_mod_data(html_content):
         "authors": authors
     }
 
+@cache.cached(timeout=300, key_prefix="mod_info_{type}_{id}")
 @app.route('/d/<type>/<id>', methods=['GET'])
 def get_mod_info(type, id):
     url = f"https://www.mcmod.cn/{type}/{id}.html"
