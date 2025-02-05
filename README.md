@@ -37,8 +37,6 @@ GET /d/{type}/{id}
 https://mcmod-api.zkitefly.eu.org/d/class/1234
 ```
 
-后尾的参数可使用网页搜索上的参数，如 `https://search.mcmod.cn/s?key=spark&site=&filter=1&mold=1` = `https://mcmod-api.zkitefly.eu.org/s/key=spark&site=&filter=1&mold=1`
-
 ## 返回数据
 
 ### 搜索 API 返回字段
