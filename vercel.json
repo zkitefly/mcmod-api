@@ -1,5 +1,25 @@
 {
-    "builds": [{ "src": "search.py", "use": "@vercel/python" }],
-    "routes": [{ "src": "/s/.*", "dest": "search.py" }],
-    "regions": ["hkg1"]
+    "builds": [
+        {
+            "src": "search.py",
+            "use": "@vercel/python"
+        },
+        {
+            "src": "data.py",
+            "use": "@vercel/python"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/s/.*",
+            "dest": "search.py"
+        },
+        {
+            "src": "/d/.*",
+            "dest": "data.py"
+        }
+    ],
+    "regions": [
+        "hkg1"
+    ]
 }
