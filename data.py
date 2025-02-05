@@ -1,7 +1,9 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 import re
 import requests
 from bs4 import BeautifulSoup
+import base64
+import urllib.parse
 from flask_caching import Cache
 
 app = Flask(__name__)
@@ -14,7 +16,17 @@ cache = Cache(app)
 def get_redirected_url(url):
     if url.startswith('//'):
         url = 'https:' + url
-    return url  # 如果出错，返回原始 URL
+
+    if url.startswith("https://link.mcmod.cn/target/"):
+        encoded_part = url[len("https://link.mcmod.cn/target/"):]
+        try:
+            decoded_bytes = base64.urlsafe_b64decode(encoded_part)
+            decoded_url = decoded_bytes.decode('utf-8') 
+            return urllib.parse.unquote(decoded_url)
+        except Exception:
+            return url  # 解码失败则返回原始 URL
+
+    return url
 
 def parse_mod_data(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -24,7 +36,7 @@ def parse_mod_data(html_content):
 
     cover_image = soup.find("div", class_="class-cover-image").find("img")["src"] if soup.find("div", class_="class-cover-image") else None
     if cover_image and cover_image.startswith('//'):
-        cover_image = 'https:' + cover_image
+        cover_image = get_redirected_url(cover_image)
 
     description_meta = soup.find("meta", {"name": "description"})
     description = description_meta["content"] if description_meta else None
@@ -49,10 +61,9 @@ def parse_mod_data(html_content):
         for link_item in link_frame.find_all("a"):
             link_text = link_item.get("data-original-title") or link_item.text.strip()
             link_url = link_item.get("href")
-            if link_url:
-                if link_url.startswith("//link.mcmod.cn"):
-                    link_url = get_redirected_url(link_url)
-                related_links.append({"text": link_text, "url": link_url})
+            if link_url and link_url.startswith("//"):
+                link_url = get_redirected_url(link_url)
+            related_links.append({"text": link_text, "url": link_url})
 
     keywords_meta = soup.find("meta", {"name": "keywords"})
     keywords = keywords_meta["content"] if keywords_meta else None
