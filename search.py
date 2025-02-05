@@ -1,104 +1,124 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, current_app
 from flask_caching import Cache
 import requests
 from bs4 import BeautifulSoup
-import re
+import logging
+from typing import Dict, List, Optional
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-cache = Cache(app, config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT': 300})  # 300 seconds = 5 minutes
+cache = Cache(app, config={
+    'CACHE_TYPE': 'simple',
+    'CACHE_DEFAULT_TIMEOUT': 300,
+    'CACHE_THRESHOLD': 500  # 限制缓存条目数
+})
+
+# 请求配置
+REQUEST_TIMEOUT = 10
+HEADERS = {
+    'User-Agent': 'mcmod-api/1.0 (github.com/zkitefly/mcmod-api)'
+}
+
+def extract_item_data(result_item) -> Dict:
+    """从搜索结果项中提取数据"""
+    item_data = {}
+    data = {}  # 新建 data 字典
+    
+    try:
+        # 提取地址
+        info_span = result_item.find('span', class_='info')
+        address = info_span.find('a')['href'].replace("//center.mcmod.cn", "https://center.mcmod.cn")
+        item_data['address'] = address
+        data['mcmod_id'] = address.split('/')[-1].replace('.html', '')
+
+        # 提取标题和相关信息
+        title = result_item.find('div', class_='head').text.strip()
+        item_data['title'] = title
+        
+        # 处理标题信息
+        if title.startswith('['):
+            data['abbr'] = title.split('] ')[0][1:]
+            main_title = title.split('] ')[-1]
+        else:
+            data['abbr'] = None
+            main_title = title
+
+        # 提取中文名和副标题
+        if ' (' in main_title:
+            chinese_name, sub_name = main_title.split(' (', 1)
+            data['chinese_name'] = chinese_name
+            data['sub_name'] = sub_name.rsplit(')', 1)[0]
+        else:
+            data['chinese_name'] = main_title
+            data['sub_name'] = None
+
+        # 提取类别
+        category_link = result_item.find('a')['href']
+        data['category'] = (category_link.replace("//www.mcmod.cn/class/category/", "")
+                          .replace("-1.html", "") if 'category' in category_link else None)
+
+        # 提取描述和快照时间
+        item_data['description'] = result_item.find('div', class_='body').text.strip()
+        item_data['snapshot_time'] = result_item.find_all('span', class_='info')[1].find('span', class_='value').text.strip()
+
+        # 特殊情况处理
+        if 'mcmod.cn/class' not in address and 'mcmod.cn/modpack' not in address:
+            data.update({
+                'chinese_name': None,
+                'sub_name': None,
+                'abbr': None,
+                'mcmod_id': None,
+                'category': None
+            })
+        
+        # 将 data 添加到 item_data
+        item_data['data'] = data
+
+    except Exception as e:
+        logger.error(f"Error extracting data from item: {e}")
+        return None
+
+    return item_data
 
 @app.route('/s/<path:search>')
-@cache.cached(timeout=300)  # Cache the response for 5 minutes
-def get_mcmod_search_result(search):
+@cache.cached(timeout=300)
+def get_mcmod_search_result(search: str) -> tuple:
+    """处理搜索请求并返回结果"""
+    url = f'https://search.mcmod.cn/s?{search}'
+    
     try:
-        # 构建URL
-        url = 'https://search.mcmod.cn/s?' + search
-        
-        # 设置请求头部，模拟浏览器行为
-        headers = {
-            'User-Agent': 'mcmod-api/1.0 (github.com/zkitefly/mcmod-api)'
-        }
-        
-        # 发起请求
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         response.encoding = response.apparent_encoding
         
-        # 使用BeautifulSoup解析HTML
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 查找class为search-result-list的div元素
         search_result_list = soup.find('div', class_='search-result-list')
         
-        # 如果没有搜索结果，直接返回空列表
         if not search_result_list:
             return jsonify([])
         
-        # 初始化结果列表
         results = []
-        
-        # 提取每个result-item的信息
         for result_item in search_result_list.find_all('div', class_='result-item'):
-            item_data = {}
-            
-            # 提取地址和检查 info
-            address = result_item.find('span', class_='info').find('a')['href'].replace("//center.mcmod.cn", "https://center.mcmod.cn")
-            item_data['address'] = address
-            
-            # 创建 mcmod_id 属性
-            item_data['mcmod_id'] = address.split('/')[-1].replace('.html', '')
-            
-            # 提取标题
-            title = result_item.find('div', class_='head').text.strip()
-            item_data['title'] = title
-            
-            # 创建 abbr 属性
-            if title.startswith('['):
-                item_data['abbr'] = title.split('] ')[0][1:]
-            else:
-                item_data['abbr'] = None
-            
-            # 创建 sub_name 属性
-            if ' (' in title:
-                sub_name = title.split(' (', 1)[-1].rsplit(')', 1)[0]
-                # if not ' ' in sub_name:
-                #     sub_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', sub_name)
-                item_data['sub_name'] = sub_name
-            else:
-                item_data['sub_name'] = title.split('] ')[-1]
-            
-            # 创建 chinese_name 属性
-            chinese_name = title.split('] ')[-1].split(' (')[0]
-            item_data['chinese_name'] = chinese_name
-            
-            # 提取类别
-            category_link = result_item.find('a')['href']
-            if 'category' in category_link:
-                item_data['category'] = category_link.replace("//www.mcmod.cn/class/category/", "").replace("-1.html", "")
-            else:
-                item_data['category'] = None
-            
-            # 提取描述
-            item_data['description'] = result_item.find('div', class_='body').text.strip()
-            
-            # 提取快照时间
-            item_data['snapshot_time'] = result_item.find_all('span', class_='info')[1].find('span', class_='value').text.strip()
-
-            if 'mcmod.cn/class' not in address and 'mcmod.cn/modpack' not in address:
-                item_data['chinese_name'] = None
-                item_data['sub_name'] = None
-                item_data['abbr'] = None
-                item_data['mcmod_id'] = None
+            item_data = extract_item_data(result_item)
+            if item_data:
                 results.append(item_data)
-                continue
-            
-            results.append(item_data)
         
-        # 返回处理后的结果
         return jsonify(results)
-    except requests.exceptions.HTTPError as e:
-        # 如果远程服务器返回4xx或5xx错误，则返回500服务端错误
-        return jsonify({'errorMessage': f'Get \'{url}\' Error.', 'error': str(e)}), 500
+
+    except requests.Timeout:
+        logger.error(f"Request timeout for URL: {url}")
+        return jsonify({'error': 'Request timeout', 'url': url}), 504
+    
+    except requests.RequestException as e:
+        logger.error(f"Request failed for URL {url}: {str(e)}")
+        return jsonify({'error': str(e), 'url': url}), 500
+    
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
