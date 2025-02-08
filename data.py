@@ -38,8 +38,8 @@ def parse_mod_data(html_content):
     if cover_image and cover_image.startswith('//'):
         cover_image = get_redirected_url(cover_image)
 
-    description_meta = soup.find("meta", {"name": "description"})
-    description = description_meta["content"] if description_meta else None
+    # description_meta = soup.find("meta", {"name": "description"})
+    # description = description_meta["content"] if description_meta else None
 
     supported_versions = {}
     mcver_section = soup.find("li", class_="col-lg-12 mcver")
@@ -129,7 +129,7 @@ def parse_mod_data(html_content):
         "title": title,
         "subtitle": subtitle,
         "cover_image": cover_image,
-        "description": description,
+        # "description": description,
         "supported_versions": supported_versions,
         "related_links": related_links,
         "keywords": keywords,
