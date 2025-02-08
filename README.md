@@ -65,6 +65,7 @@ https://mcmod-api.zkitefly.eu.org/d/class/1234
 - `last_recommend_time`: 最后推荐时间
 - `edit_count`: 编辑次数
 - `authors`: 作者信息
+- `mod_relations`: 关联模组
 
 ## 部署
 
