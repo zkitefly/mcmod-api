@@ -55,6 +55,29 @@ def parse_mod_data(html_content):
                 version = element.text.strip()
                 supported_versions[current_loader].append(version)
 
+    mod_relations = {}
+    relation_list = soup.find("ul", class_="class-relation-list")
+    if relation_list:
+        for fieldset in relation_list.find_all("fieldset"):
+            category = fieldset.find("legend").text.strip() if fieldset.find("legend") else "未知分类"
+            mod_relations[category] = []
+
+            for relation_item in fieldset.find_all("li", class_="relation"):
+                relation_type = relation_item.find("span").text.strip() if relation_item.find("span") else "未知关系"
+
+                related_mods = []
+                for mod in relation_item.find_all("a"):
+                    mod_name = mod.text.strip()
+                    mod_link = mod.get("href")
+                    if mod_name and mod_link:
+                        related_mods.append({"name": mod_name, "link": mod_link})
+
+                if related_mods:
+                    mod_relations[category].append({
+                        "relation_type": relation_type,
+                        "mods": related_mods
+                    })
+
     related_links = []
     link_frame = soup.find("div", class_="common-link-frame")
     if link_frame:
@@ -140,7 +163,8 @@ def parse_mod_data(html_content):
         "last_edit_time": last_edit_time,
         "last_recommend_time": last_recommend_time,
         "edit_count": edit_count,
-        "authors": authors
+        "authors": authors,
+        "mod_relations": mod_relations
     }
 
 @cache.cached(timeout=300, key_prefix="mod_info_{type}_{id}")
