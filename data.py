@@ -65,8 +65,8 @@ def parse_mod_data(html_content):
                 link_url = get_redirected_url(link_url)
             related_links.append({"text": link_text, "url": link_url})
 
-    keywords_meta = soup.find("meta", {"name": "keywords"})
-    keywords = keywords_meta["content"] if keywords_meta else None
+    # keywords_meta = soup.find("meta", {"name": "keywords"})
+    # keywords = keywords_meta["content"] if keywords_meta else None
 
     operating_environment = None
     match = re.search(r'<li class="col-lg-4">运行环境:\s*(.*?)</li>', html_content)
@@ -132,7 +132,7 @@ def parse_mod_data(html_content):
         # "description": description,
         "supported_versions": supported_versions,
         "related_links": related_links,
-        "keywords": keywords,
+        # "keywords": keywords,
         "operating_environment": operating_environment,
         "tag_links": tag_links,
         "short_name": short_name,
